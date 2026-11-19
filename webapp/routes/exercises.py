@@ -15,10 +15,11 @@ from data.data_processing.data_loading import load_question_text
 from data.data_processing.total_questions import total_question_exercises
 from users.questions.prompting import get_response_from_prompt
 
-from users.users.models import db, UserExerciseState
+from users.users.models import db, AnswerAttempt, UserExerciseState
 from users.users.settings import (is_feedback_enabled, is_instruction_page_enabled, get_filename_empty_bookmark,
     get_filename_full_bookmark, get_filename_flag, are_options_in_word_order_exercises_hidden)
 
+from users.progress.attempts import record_answer_attempt
 from users.progress.progress import compute_answered_questions, update_progress_in_home_page
 from users.progress.register_update import register_progress, register_incorrect_answer
 from users.progress.is_exercise_finished import is_exercise_finished
@@ -238,6 +239,11 @@ def check_answer(unit, exercise):
 
     result = "correct" if is_answer_correct else "incorrect"
 
+    # Record every submission, including empty answers (which are treated as
+    # incorrect). Must run before the progress helpers mutate the stored state
+    # so is_first_attempt reflects the state before this answer.
+    record_answer_attempt(session, unit, exercise, question_id, user_answer, is_answer_correct)
+
     if is_answer_correct:
         register_progress(session, unit, exercise, question_id)
     elif question_id not in session[unit][str(exercise)]['falses']:
@@ -246,6 +252,11 @@ def check_answer(unit, exercise):
                                       translation=translation, cefr_level=cefr_level, commentary=commentary)
         else:
             register_incorrect_answer(session, unit, exercise, question_id, user_answer)
+
+    # The progress helpers commit only when they write state; make sure an
+    # attempt is still persisted when a repeated wrong answer changes nothing.
+    if current_user.is_authenticated:
+        db.session.commit()
 
     session.modified = True
 
@@ -352,8 +363,14 @@ def reset_exercise(unit, exercise):
         if row:
             # Remove any stored result and JSON state by deleting the row
             db.session.delete(row)
-            db.session.commit()
-            invalidate_user_exercise_states()
+
+        # ET2: resetting an exercise also deletes its attempt history.
+        AnswerAttempt.query.filter_by(
+            user_id=current_user.id, unit=unit, exercise=int(exercise)
+        ).delete()
+
+        db.session.commit()
+        invalidate_user_exercise_states()
 
         update_progress_in_home_page(session, unit)
 

@@ -53,6 +53,7 @@
                 {% endif %}
 
                 <a href="{{ url_for('routes.progress') }}" class="progress-link">Progression</a>
+                <a href="{{ url_for('routes.stats') }}">Statistiques</a>
 
                 {% if current_user.is_authenticated %}
                     <a href="{{ url_for('routes.bookmarks') }}">Favoris</a>
@@ -68,6 +69,7 @@
                 {% endif %}
 
                 <a href="{{ url_for('routes.progress') }}" class="progress-link">Progress</a>
+                <a href="{{ url_for('routes.stats') }}">Statistics</a>
 
                 {% if current_user.is_authenticated %}
                     <a href="{{ url_for('routes.bookmarks') }}">Bookmarks</a>

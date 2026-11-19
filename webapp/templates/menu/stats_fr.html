@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <title>Statistiques – Sievers Study Hall</title>
+    <meta name="description" content="Consultez votre précision, vos points faibles et les questions les plus souvent manquées.">
+    {% from "macros/header.html" import header %}
+    {{ header() }}
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/menu.css', v='2026-04-25-1') }}">
+
+    <style>
+        .stats-period a { margin-right: 0.75em; }
+        .stats-period a.active { font-weight: bold; text-decoration: underline; }
+
+        .trend-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 180px;
+            overflow-x: auto;
+            padding: 0.5em 0;
+            border-bottom: 1px solid #888;
+        }
+        .trend-column {
+            flex: 1 0 22px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            height: 100%;
+        }
+        .trend-bar {
+            width: 100%;
+            min-height: 2px;
+            background: #4a7fb5;
+            border-radius: 2px 2px 0 0;
+        }
+        .trend-label {
+            font-size: 0.65em;
+            writing-mode: vertical-rl;
+            max-height: 48px;
+            overflow: hidden;
+        }
+
+        .weak-row { margin: 1em 0; }
+        .weak-head { display: flex; justify-content: space-between; gap: 1em; }
+        .weak-bar-track {
+            background: #444;
+            height: 14px;
+            border-radius: 7px;
+            overflow: hidden;
+            margin: 0.35em 0;
+        }
+        .weak-bar-fill { background: #c0603c; height: 100%; }
+        .weak-meta { font-size: 0.85em; opacity: 0.85; }
+
+        .stat-card {
+            display: inline-block;
+            min-width: 220px;
+            padding: 1em 1.5em;
+            margin: 0.5em 0;
+            border: 1px solid #888;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-number { font-size: 2.4em; font-weight: bold; }
+
+        .stats-table { width: 100%; border-collapse: collapse; }
+        .stats-table th, .stats-table td {
+            text-align: left;
+            padding: 0.45em 0.6em;
+            border-bottom: 1px solid #555;
+            vertical-align: top;
+        }
+    </style>
+</head>
+<body class="{{ 'day-mode' if is_day_mode else '' }}">
+
+{% from "macros/render_title.html" import render_title with context %}
+{% from "macros/button.html" import display_homepage_button %}
+
+    {{ render_title("Statistiques") }}
+
+    {% if not is_authenticated %}
+    <div class="section">
+        <h2>Statistiques de pratique</h2>
+        <p>Vous pratiquez en mode anonyme. Ces statistiques sont conservées uniquement
+            dans cette session de navigateur et disparaissent à la fin de celle-ci.</p>
+        <p><a class="button" href="{{ url_for('routes.signup') }}">Créer un compte pour conserver vos statistiques</a></p>
+
+        {% if anonymous_rows %}
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>Exercice</th>
+                    <th>Score</th>
+                    <th>Erreurs connues</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in anonymous_rows %}
+                <tr>
+                    <td>
+                        <a href="/guidance/unit/{{ row.unit }}/exercise/{{ row.exercise }}">
+                            {{ unit_name[row.unit] }} {{ row.exercise }}
+                        </a>
+                    </td>
+                    <td>{{ (row.score * 100)|round(0)|int }}%</td>
+                    <td>{{ row.errors }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>Aucune activité dans cette session pour le moment.</p>
+        {% endif %}
+    </div>
+
+    {% else %}
+
+    <div class="section">
+        <h2>Précision dans le temps</h2>
+        <p class="stats-period">
+            Période :
+            {% for option in [7, 30, 90, 365] %}
+                <a href="{{ url_for('routes.stats', days=option) }}"
+                   class="{{ 'active' if days == option else '' }}">{{ option }} jours</a>
+            {% endfor %}
+        </p>
+
+        {% if trend %}
+        <div class="trend-chart">
+            {% for bucket in trend %}
+                {% set pct = (bucket.correct / bucket.total * 100) if bucket.total else 0 %}
+                <div class="trend-column"
+                     title="{{ bucket.day }} : {{ bucket.correct }}/{{ bucket.total }} correctes">
+                    <div class="trend-bar" style="height: {{ pct|round(1) }}%"></div>
+                    <span class="trend-label">{{ bucket.day }}</span>
+                </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p>Aucune réponse enregistrée sur cette période.</p>
+        {% endif %}
+    </div>
+
+    <div class="section">
+        <h2>Points faibles</h2>
+        {% if unit_errors %}
+            {% for row in unit_errors %}
+            <div class="weak-row">
+                <div class="weak-head">
+                    <a href="/guidance/unit/{{ row.unit }}/exercise/1">{{ unit_name[row.unit] }}</a>
+                    <span>{{ categories.get(row.unit, '') }}</span>
+                </div>
+                <div class="weak-bar-track">
+                    <div class="weak-bar-fill" style="width: {{ (row.error_rate * 100)|round(1) }}%"></div>
+                </div>
+                <div class="weak-meta">
+                    {{ row.errors }} erreurs sur {{ row.attempts }} tentatives
+                    ({{ (row.error_rate * 100)|round(1) }}%)
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <p>Pas encore assez de tentatives pour identifier des points faibles (au moins 5 par unité).</p>
+        {% endif %}
+    </div>
+
+    {% if exercise_errors %}
+    <div class="section">
+        <h2>Exercices les plus difficiles</h2>
+        <table class="stats-table">
+            <thead>
+                <tr><th>Exercice</th><th>Erreurs</th><th>Tentatives</th><th>Taux d'erreur</th></tr>
+            </thead>
+            <tbody>
+                {% for row in exercise_errors %}
+                <tr>
+                    <td>
+                        <a href="/guidance/unit/{{ row.unit }}/exercise/{{ row.exercise }}">
+                            {{ unit_name[row.unit] }} {{ row.exercise }}
+                        </a>
+                    </td>
+                    <td>{{ row.errors }}</td>
+                    <td>{{ row.attempts }}</td>
+                    <td>{{ (row.error_rate * 100)|round(1) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="section">
+        <h2>Questions les plus souvent manquées</h2>
+        {% if missed %}
+        <table class="stats-table">
+            <thead>
+                <tr><th>Exercice</th><th>Nr</th><th>Question</th><th>Échecs</th></tr>
+            </thead>
+            <tbody>
+                {% for row in missed %}
+                <tr>
+                    <td>
+                        <a href="/guidance/unit/{{ row.unit }}/exercise/{{ row.exercise }}">
+                            {{ unit_name[row.unit] }} {{ row.exercise }}
+                        </a>
+                    </td>
+                    <td>{{ row.question_nr }}</td>
+                    <td>{{ row.question }}</td>
+                    <td>{{ row.errors }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>Aucune question manquée enregistrée pour le moment.</p>
+        {% endif %}
+    </div>
+
+    <div class="section">
+        <h2>Précision à la première tentative</h2>
+        {% if first_attempt and first_attempt.total %}
+        <div class="stat-card">
+            <div class="stat-number">{{ (first_attempt.accuracy * 100)|round(0)|int }}%</div>
+            <p>{{ first_attempt.correct }}/{{ first_attempt.total }} premières réponses correctes</p>
+        </div>
+
+        {% if first_attempt.by_unit %}
+        <table class="stats-table">
+            <thead>
+                <tr><th>Unité</th><th>Premières réponses</th><th>Correctes</th><th>Précision</th></tr>
+            </thead>
+            <tbody>
+                {% for row in first_attempt.by_unit %}
+                <tr>
+                    <td>{{ unit_name[row.unit] }}</td>
+                    <td>{{ row.total }}</td>
+                    <td>{{ row.correct }}</td>
+                    <td>{{ (row.accuracy * 100)|round(1) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        {% else %}
+        <p>Aucune première tentative sur cette période.</p>
+        {% endif %}
+    </div>
+
+    {% endif %}
+
+    {{ display_homepage_button(homepage) }}
+
+</body>
+</html>

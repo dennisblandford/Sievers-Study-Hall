@@ -16,12 +16,14 @@ from data.content.application.buttons import HOMEPAGE, UNIT_PARTICULARLY_LIKE_BY
 
 from data.data_processing.units import units, units_without_alpha
 from data.data_processing.exercises import get_exercises_by_unit_and_level, levels, get_level_from_exercise, \
-    is_exercise_prompt
+    is_exercise_prompt, get_category_from_exercise
 from data.data_processing.separations import separations
 from data.data_processing.total_questions import total_question_exercises, highest_exercise_per_unit
 
 from users.users.models import Bookmark
 from users.users.settings import get_filename_empty_bookmark, get_filename_full_bookmark, get_filename_flag
+from users.progress.analytics import get_accuracy_trend, get_error_rate_by_unit, \
+    get_error_rate_by_exercise, get_most_missed_questions, get_first_attempt_accuracy
 from users.progress.score import write_score, get_lowest_scored_exercises
 from users.progress.progress import compute_answered_questions, update_progress_in_home_page, is_exercise_started, \
     get_fraction_exercises_finished_by_level, get_random_unit_and_lowest_unfinished_exercise, get_unfinished_exercises, \
@@ -240,6 +242,109 @@ def progress():
         is_exercise_started=is_exercise_started,
         lowest_score_exercises=lowest_score_exercises,
         get_level_from_exercise=get_level_from_exercise,
+        homepage=HOMEPAGE[language],
+    )
+
+
+def _anonymous_stats(web_session):
+    """Build a small, ephemeral statistics view from session progress."""
+    rows = []
+
+    for unit in units:
+        unit_data = web_session.get(unit)
+        if not isinstance(unit_data, dict):
+            continue
+
+        for exercise_str, data in unit_data.items():
+            if not isinstance(data, dict):
+                continue
+
+            try:
+                exercise = int(exercise_str)
+                total = int(total_question_exercises[unit][exercise])
+            except (TypeError, ValueError, KeyError, IndexError):
+                continue
+
+            progress = set(data.get("progress") or [])
+            falses = set(data.get("falses") or [])
+            summary = data.get("result")
+
+            if summary is None and not progress and not falses:
+                continue
+
+            if summary is not None:
+                try:
+                    score = float(summary)
+                except (TypeError, ValueError):
+                    score = 0.0
+            else:
+                correct = len(progress - falses)
+                score = (correct / total) if total else 0.0
+
+            rows.append({
+                "unit": unit,
+                "exercise": exercise,
+                "total": total,
+                "score": score,
+                "errors": len(falses),
+            })
+
+    rows.sort(key=lambda row: (row["score"], -row["errors"]))
+    return rows
+
+
+@routes_bp.route("/stats", endpoint="stats")
+def stats():
+
+    language = get_language(request, session)
+
+    try:
+        days = int(request.args.get("days", 30))
+    except (TypeError, ValueError):
+        days = 30
+
+    days = max(1, min(days, 365))
+
+    page = {
+        'english': 'menu/stats_en.html',
+        'french': 'menu/stats_fr.html',
+    }
+
+    is_authenticated = current_user.is_authenticated
+
+    trend = []
+    unit_errors = []
+    exercise_errors = []
+    missed = []
+    first_attempt = None
+    categories = {}
+    anonymous_rows = []
+
+    if is_authenticated:
+        trend = get_accuracy_trend(days)
+        unit_errors = get_error_rate_by_unit(days)
+        exercise_errors = get_error_rate_by_exercise(days)
+        missed = get_most_missed_questions(days=max(days, 90), limit=10)
+        first_attempt = get_first_attempt_accuracy(days)
+        categories = {
+            row["unit"]: get_category_from_exercise(row["unit"], 1)
+            for row in unit_errors
+        }
+    else:
+        anonymous_rows = _anonymous_stats(session)
+
+    return render_template(
+        page[language],
+        days=days,
+        is_authenticated=is_authenticated,
+        trend=trend,
+        unit_errors=unit_errors,
+        exercise_errors=exercise_errors,
+        missed=missed,
+        first_attempt=first_attempt,
+        categories=categories,
+        anonymous_rows=anonymous_rows,
+        unit_name=UNIT_NAME[language],
         homepage=HOMEPAGE[language],
     )
 
