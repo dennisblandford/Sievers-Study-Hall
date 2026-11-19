@@ -205,7 +205,19 @@ def check_answer(unit, exercise):
     if question_id is None or not question_id.isdecimal():
         abort(400, description="Invalid question ID")
 
-    if is_exercise_prompt(unit, exercise):
+    # An empty submission means the user does not know the answer. Treat it as
+    # incorrect so the answer is revealed, and never send it to the grading
+    # model. This also prevents empty answers from matching questions whose
+    # expected answer is itself empty.
+    is_empty_answer = not user_answer.strip()
+
+    translation = ""
+    cefr_level = ""
+    commentary = ""
+
+    if is_empty_answer:
+        is_answer_correct = False
+    elif is_exercise_prompt(unit, exercise):
         prompt = format_prompt(unit, exercise, language, question_id, user_answer)
         response = get_response_from_prompt(unit, exercise, prompt)
 
@@ -242,7 +254,7 @@ def check_answer(unit, exercise):
     update_session_dictionary(session, "feedback", "previous_question_id", question_id)
     update_session_dictionary(session, "current_exercise", "question_id", question_id)
 
-    if is_feedback_enabled() or is_exercise_prompt(unit, exercise):
+    if is_empty_answer or is_feedback_enabled() or is_exercise_prompt(unit, exercise):
         route = 'routes.feedback_page'
     else:
         route = 'routes.exercise_page'
