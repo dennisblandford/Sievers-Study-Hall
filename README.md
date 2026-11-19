@@ -34,6 +34,17 @@ uv run ruff check
 uv run ruff format
 ```
 
+## Accounts
+
+Accounts use a Mullvad-style account code instead of an email address and
+password. Signing up creates a random UUID code that is shown once; save it,
+because it is the only way to sign in. An email address is optional and is only
+used to send the account code back if you lose it.
+
+Existing databases are migrated automatically on startup: the old password
+column is dropped and every user receives an account code. Existing email
+addresses are kept as recovery aliases.
+
 ## Deploy on your own server
 
 Requirements: Docker with the Compose plugin.
@@ -53,7 +64,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 Optional:
 
 - `HF_TOKEN` enables AI-graded prompt exercises.
-- `MAIL_USERNAME` / `MAIL_PASSWORD` enable password-reset emails.
+- `MAIL_USERNAME` / `MAIL_PASSWORD` enable recovery emails (the account code).
 
 ### 2. Start
 
@@ -80,7 +91,7 @@ Traefik, a Cloudflare Tunnel, etc.) and forward `X-Forwarded-Proto`,
 | `FLASK_SECRET_KEY` | Session signing key (set a strong value in production) |
 | `DATABASE_URL` | SQLite location (Docker default: `/data/prod.db`) |
 | `HF_TOKEN` | Enables AI-graded prompt exercises |
-| `MAIL_USERNAME` / `MAIL_PASSWORD` | Password-reset email |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | Optional recovery email (account code) |
 | `SESSION_COOKIE_SECURE` | Set to `1` when serving over HTTPS |
 | `PORT` | Local Flask dev server only |
 
