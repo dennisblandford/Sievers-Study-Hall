@@ -43,9 +43,8 @@ def app():
         db.drop_all()
 
 
-def make_user(email):
-    user = User(email=email)
-    user.set_password("password")
+def make_user(account_id):
+    user = User(account_id=account_id)
     db.session.add(user)
     db.session.commit()
     return user

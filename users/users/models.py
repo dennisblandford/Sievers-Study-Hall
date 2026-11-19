@@ -1,13 +1,18 @@
 from datetime import datetime, timezone
 import sqlite3
+import uuid
 
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
+
+
+def generate_account_id() -> str:
+    """Return a new random account identifier (UUID4 string)."""
+    return str(uuid.uuid4())
 
 
 @event.listens_for(Engine, "connect")
@@ -25,17 +30,13 @@ from sqlalchemy.dialects.sqlite import JSON as SQLITE_JSON
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
-
-    def __init__(self, email, **kwargs):
-        super().__init__(**kwargs)
-        self.email = email
-
-    password_hash = db.Column(db.String(255), nullable=False)
+    account_id = db.Column(db.String(36), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(255), unique=True, nullable=True, index=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
-    def set_password(self, pw): self.password_hash = generate_password_hash(pw)
-    def check_password(self, pw): return check_password_hash(self.password_hash, pw)
+    def __init__(self, account_id=None, **kwargs):
+        super().__init__(**kwargs)
+        self.account_id = account_id or generate_account_id()
 
 
 class UserSettings(db.Model):

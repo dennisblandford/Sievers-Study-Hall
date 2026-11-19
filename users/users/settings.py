@@ -4,6 +4,7 @@ from flask_login import current_user
 from users.users.models import UserSettings
 
 DEFAULT_SETTINGS = {
+    "account_code_acknowledged": False,
     "feedback_enabled": True,
     "theme": "night",
     "special_characters_enabled": True,
