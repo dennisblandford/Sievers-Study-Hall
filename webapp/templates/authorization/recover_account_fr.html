@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <title>Sievers Study Hall – Récupérer le code de compte</title>
+    <meta name="description" content="Récupérez votre code de compte grâce à l'e-mail de secours facultatif.">
+    {% from "macros/header.html" import header %}
+    {{ header() }}
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/authorization.css') }}"></head>
+
+<body class="{{ 'day-mode' if is_day_mode else '' }}">
+
+{% from "macros/render_title.html" import render_title with context %}
+{% from "macros/button.html" import display_homepage_button %}
+
+    {{ render_title("Sievers Study Hall") }}
+
+    {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+            <div class="flashes">
+                {% for category, message in messages %}
+                    <p class="flash {{ category }}">{{ message }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <h2>Récupérer votre code de compte</h2>
+
+    <p>Si vous avez ajouté un e-mail de secours facultatif dans vos paramètres, nous
+        pouvons vous y envoyer votre code de compte.</p>
+
+    <form method="post" action="{{ url_for('routes.recover_account') }}" autocomplete="off">
+        <label for="email">E-mail de secours</label>
+        <br>
+        <input id="email" name="email" type="email" class="input-authorization" required autofocus>
+        <br><br>
+        <button type="submit" class="button">Envoyer mon code de compte</button>
+    </form>
+
+    <p>Si vous n'avez jamais ajouté d'e-mail de secours, le code de compte ne peut pas être récupéré.</p>
+
+    <p><a href="{{ url_for('routes.signin') }}">Retour à la connexion</a></p>
+
+    {{ display_homepage_button(homepage) }}
+
+</body>
+</html>

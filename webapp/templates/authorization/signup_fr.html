@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="fr">
 <head>
-    <title>Sievers Study Hall – Sign up</title>
-    <meta name="description" content="Create an account to track your German exercises across devices.">
+    <title>Sievers Study Hall – Créer un compte</title>
+    <meta name="description" content="Créez un compte pour suivre vos exercices d'allemand sur tous vos appareils.">
     {% from "macros/header.html" import header %}
     {{ header() }}
 
@@ -27,20 +27,12 @@
 
     <h2>Créer un compte</h2>
 
+    <p>Aucune adresse e-mail ni mot de passe n'est nécessaire. Nous allons générer un
+        code de compte unique pour vous. Conservez-le : c'est le seul moyen de vous
+        connecter et de retrouver votre progression.</p>
+
     <form method="post" action="{{ url_for('routes.signup') }}" autocomplete="off">
-        <label for="email">E-mail</label>
-        <br>
-        <input id="email" name="email" type="email" class="input-authorization" required autofocus>
-        <br><br>
-        <label for="password">Mot de passe (minimum 8 caractères)</label>
-        <br>
-        <input id="password" name="password" type="password" minlength="8" class="input-authorization" required>
-        <br><br>
-        <label for="password2">Confirmer le mot de passe</label>
-        <br>
-        <input id="password2" name="password2" type="password" minlength="8" class="input-authorization" required>
-        <br><br>
-        <button type="submit" class="button">S'inscrire</button>
+        <button type="submit" class="button">Créer le compte</button>
     </form>
 
     <p>Vous avez déjà un compte ? <a href="{{ url_for('routes.signin') }}">Se connecter</a>.</p>
