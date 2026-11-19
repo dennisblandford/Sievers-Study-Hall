@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Sievers Study Hall – Recover account code</title>
+    <meta name="description" content="Recover your account code using the optional recovery email on file.">
+    {% from "macros/header.html" import header %}
+    {{ header() }}
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/authorization.css') }}"></head>
+
+<body class="{{ 'day-mode' if is_day_mode else '' }}">
+
+{% from "macros/render_title.html" import render_title with context %}
+{% from "macros/button.html" import display_homepage_button %}
+
+    {{ render_title("Sievers Study Hall") }}
+
+    {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+            <div class="flashes">
+                {% for category, message in messages %}
+                    <p class="flash {{ category }}">{{ message }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <h2>Recover your account code</h2>
+
+    <p>If you added an optional recovery email in your settings, we can send your
+        account code there.</p>
+
+    <form method="post" action="{{ url_for('routes.recover_account') }}" autocomplete="off">
+        <label for="email">Recovery email</label>
+        <br>
+        <input id="email" name="email" type="email" class="input-authorization" required autofocus>
+        <br><br>
+        <button type="submit" class="button">Send my account code</button>
+    </form>
+
+    <p>If you never added a recovery email, the account code cannot be recovered.</p>
+
+    <p><a href="{{ url_for('routes.signin') }}">Back to sign in</a></p>
+
+    {{ display_homepage_button(homepage) }}
+
+</body>
+</html>

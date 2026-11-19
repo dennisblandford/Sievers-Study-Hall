@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Sievers Study Hall – Your account code</title>
+    <meta name="description" content="Save your new account code. It is the only way to sign in.">
+    {% from "macros/header.html" import header %}
+    {{ header() }}
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/authorization.css') }}"></head>
+
+<body class="{{ 'day-mode' if is_day_mode else '' }}">
+
+{% from "macros/render_title.html" import render_title with context %}
+
+    {{ render_title("Sievers Study Hall") }}
+
+    <h2>Your account has been created</h2>
+
+    <p>This is your account code:</p>
+
+    <p>
+        <code id="account-code-value" class="account-code"
+              style="display:block; font-family: monospace; font-size: 1.4em; padding: 1em; margin: 1em 0; word-break: break-all;">
+            {{ account_id }}
+        </code>
+    </p>
+
+    <p>
+        <button type="button" class="button" id="copy-account-code">Copy account code</button>
+    </p>
+
+    <p><strong>Save this now. We cannot recover it for you.</strong>
+        Anyone with this code can sign in to your account, so keep it private.</p>
+
+    <form method="post" action="{{ url_for('routes.account_created') }}">
+        <button type="submit" class="button">I've saved my account code</button>
+    </form>
+
+    <script>
+        document.getElementById("copy-account-code").addEventListener("click", function () {
+            const code = document.getElementById("account-code-value").textContent.trim();
+            const button = this;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(function () {
+                    button.textContent = "Copied!";
+                });
+            } else {
+                const range = document.createRange();
+                range.selectNodeContents(document.getElementById("account-code-value"));
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+                document.execCommand("copy");
+                button.textContent = "Copied!";
+            }
+        });
+    </script>
+
+</body>
+</html>

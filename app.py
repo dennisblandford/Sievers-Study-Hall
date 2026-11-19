@@ -5,6 +5,7 @@ from flask_mail import Mail
 from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from webapp.extensions import limiter
 from webapp.routes import routes_bp
 from users.users.models import db, User
 
@@ -32,6 +33,8 @@ app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
 mail = Mail()
 mail.init_app(app)
 
+limiter.init_app(app)
+
 db.init_app(app)
 
 # Minimal Flask-Login setup (needed for login_user/logout_user)
@@ -49,3 +52,5 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 with app.app_context():
     db.create_all()
+    from webapp.migration_account_ids import migrate_account_ids
+    migrate_account_ids()

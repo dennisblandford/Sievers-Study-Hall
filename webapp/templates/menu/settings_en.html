@@ -78,12 +78,34 @@
     {% if current_user.is_authenticated %}
     <div class="section no-border">
         <h2>Account</h2>
-        <p>You are connected with {{ email }}</p>
+        <p>Your account code:</p>
+        <code id="settings-account-code"
+              style="display:block; font-family: monospace; font-size: 1.1em; padding: 0.75em; margin: 0.75em 0; word-break: break-all;">{{ account_id }}</code>
+        <button type="button" class="button" id="copy-settings-account-code">Copy account code</button>
+
+        {% if email %}
+            <p>Recovery email: {{ email }}</p>
+        {% else %}
+            <p>No recovery email on file.</p>
+        {% endif %}
 
         <form method="post" action="{{ url_for('routes.signout') }}">
             <button type="submit" class="button">Sign out</button>
         </form>
     </div>
+
+    <script>
+        document.getElementById("copy-settings-account-code").addEventListener("click", function () {
+            const code = document.getElementById("settings-account-code").textContent.trim();
+            const button = this;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(function () {
+                    button.textContent = "Copied!";
+                });
+            }
+        });
+    </script>
     {% endif %}
 
     <div class="section no-border">

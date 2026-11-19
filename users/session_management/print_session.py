@@ -36,7 +36,7 @@ def print_user_info_from_db():
     if current_user.is_authenticated:
         print("\n=== USER INFO ===")
         print(f"User ID: {current_user.id}")
-        print(f"Email: {current_user.email}")
+        print(f"Account ID: {current_user.account_id}")
         print(f"Created at: {current_user.created_at}")
 
         print("\n=== DATABASE PROGRESS ===")

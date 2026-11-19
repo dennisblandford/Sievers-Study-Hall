@@ -218,7 +218,7 @@ def register_result(session, unit, exercise, feedback):
 
         # Optional: analytics/logging
         if len(feedback) > 0:
-            log_exercise_completed(unit, ex_int, score_final, email=current_user.email)
+            log_exercise_completed(unit, ex_int, score_final, user_id=current_user.id)
 
         # We don't need to touch session for logged-in users, but it's harmless to clean:
         if unit in session and ex_str in session[unit]:

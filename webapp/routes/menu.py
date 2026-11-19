@@ -119,9 +119,11 @@ def settings():
         'french': 'menu/settings_fr.html',
     }
 
+    account_id = current_user.account_id if current_user.is_authenticated else None
     email = current_user.email if current_user.is_authenticated else None
 
     return render_template(page[language],
+                           account_id=account_id,
                            email=email,
                            homepage=HOMEPAGE[language],
                            is_authenticated=current_user.is_authenticated,
