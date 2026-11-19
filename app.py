@@ -3,6 +3,7 @@ from datetime import timedelta
 from flask import Flask
 from flask_mail import Mail
 from flask_login import LoginManager
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from webapp.routes import routes_bp
 from users.users.models import db, User
@@ -13,8 +14,14 @@ app = Flask(__name__,
             template_folder='webapp/templates')
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'secret_key_for_development_environment')
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///prod.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///prod.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Trust the reverse proxy (nginx / Cloudflare Tunnel) for scheme, host and IP.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "0") == "1"
 
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
 app.config["MAIL_PORT"] = 587
