@@ -2,7 +2,7 @@ from flask_login import current_user
 
 from data.data_processing.data_loading import load_data_exercise
 
-from users.users.models import UserExerciseState
+from users.progress.exercise_state_cache import get_user_exercise_states
 from users.session_management.verification_session import init_session_key
 
 
@@ -28,9 +28,7 @@ def pick_a_question(session, unit, exercise):
     ex_int = int(exercise) if not isinstance(exercise, int) else exercise
 
     if current_user.is_authenticated:
-        row = UserExerciseState.query.filter_by(
-            user_id=current_user.id, unit=unit, exercise=ex_int
-        ).first()
+        row = get_user_exercise_states(current_user.id).get((unit, ex_int))
 
         correct_nrs = set()
         if row and row.state:

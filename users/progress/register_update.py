@@ -6,6 +6,7 @@ from data.data_processing.total_questions import total_question_exercises
 
 from users.users.models import db, UserExerciseState
 from users.progress.score import compute_score
+from users.progress.exercise_state_cache import invalidate_user_exercise_states
 from users.session_management.logging import log_exercise_completed
 from users.session_management.verification_session import is_key_in_exercise, init_session_key
 
@@ -55,6 +56,7 @@ def register_progress(session, unit, exercise, nr):
         row.state = next_state
         row.updated_at = datetime.now(timezone.utc)
         db.session.commit()
+        invalidate_user_exercise_states()
         return
 
     else:
@@ -138,6 +140,7 @@ def register_incorrect_answer(session, unit, exercise, nr, incorrect_answer,
         row.updated_at = datetime.now(timezone.utc)
 
         db.session.commit()
+        invalidate_user_exercise_states()
         return
 
     else:
@@ -211,6 +214,7 @@ def register_result(session, unit, exercise, feedback):
         row.completed_at = datetime.now(timezone.utc)
         row.updated_at = row.completed_at
         db.session.commit()
+        invalidate_user_exercise_states()
 
         # Optional: analytics/logging
         if len(feedback) > 0:

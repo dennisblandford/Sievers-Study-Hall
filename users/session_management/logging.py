@@ -227,7 +227,11 @@ def get_next_number(file):
     """
     Determines the next available sequential number for a CSV file entry.
 
-    Opens the given file and reads all non-empty lines. If the file has at least
+    Reads backwards from the end of the file until the last two lines are
+    available, so the cost does not grow with the size of the log file (the
+    previous implementation read every line on every append).
+
+    Reads all non-empty lines. If the file has at least
     one data line (besides the header), extracts the number from the first column
     of the last line and increments it. Returns 1 if the file is empty or the number
     cannot be parsed.
@@ -239,18 +243,42 @@ def get_next_number(file):
         int: The next available entry number.
     """
     next_nr = 1
-    if os.path.exists(file):
-        with open(file, "r", encoding="utf-8") as file:
-            lines = [line for line in file if line.strip()]
-            if len(lines) > 1:
-                last_line = lines[-1]
-                try:
-                    last_nr = int(last_line.split(";")[0])
-                    next_nr = last_nr + 1
-                except ValueError:
-                    pass
+
+    if not os.path.exists(file):
+        return next_nr
+
+    try:
+        with open(file, "rb") as file_handle:
+            file_handle.seek(0, os.SEEK_END)
+            position = file_handle.tell()
+
+            if position == 0:
+                return next_nr
+
+            block_size = 4096
+            data = b""
+
+            # Accumulate the tail of the file until it contains the newline
+            # that starts the last line (plus one more, so the line is fully
+            # contained) or until we reach the beginning of the file.
+            while position > 0 and data.count(b"\n") < 2:
+                read_size = min(block_size, position)
+                position -= read_size
+                file_handle.seek(position)
+                data = file_handle.read(read_size) + data
+
+        lines = [line for line in data.splitlines() if line.strip()]
+        if len(lines) > 1:
+            last_line = lines[-1].decode("utf-8", errors="replace")
+            try:
+                return int(last_line.split(";")[0]) + 1
+            except ValueError:
+                pass
+    except OSError:
+        pass
 
     return next_nr
+
 
 
 def format_entry(input_text):

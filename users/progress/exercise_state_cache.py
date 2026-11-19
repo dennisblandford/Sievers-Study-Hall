@@ -1,4 +1,4 @@
-from flask import g
+from flask import g, has_request_context
 
 from users.users.models import UserExerciseState
 
@@ -29,3 +29,15 @@ def get_user_exercise_states(user_id):
         g._exercise_state_cache = cache
 
     return cache["states"]
+
+
+def invalidate_user_exercise_states():
+    """
+    Drops the per-request exercise-state cache after a write.
+
+    Write paths (progress/result registration, reset) mutate
+    UserExerciseState directly, so any map populated earlier in the same
+    request may be stale and must be rebuilt on next access.
+    """
+    if has_request_context() and hasattr(g, "_exercise_state_cache"):
+        del g._exercise_state_cache

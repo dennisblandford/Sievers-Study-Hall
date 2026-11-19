@@ -5,7 +5,7 @@ from flask_login import current_user
 from data.data_processing.data_loading import load_data_exercise
 from data.data_processing.exercises import is_exercise_prompt
 
-from users.users.models import UserExerciseState
+from users.progress.exercise_state_cache import get_user_exercise_states
 from users.questions.content_format import format_feedback
 
 
@@ -34,11 +34,7 @@ def get_incorrect_answers(session, unit, exercise):
     # ----------------------------------------------------------
 
     if current_user.is_authenticated:
-        row = UserExerciseState.query.filter_by(
-            user_id=current_user.id,
-            unit=unit,
-            exercise=ex_int
-        ).first()
+        row = get_user_exercise_states(current_user.id).get((unit, ex_int))
 
         if row and row.state:
             incorrect = row.state.get("incorrect") or {}

@@ -22,6 +22,7 @@ from users.users.settings import (is_feedback_enabled, is_instruction_page_enabl
 from users.progress.progress import compute_answered_questions, update_progress_in_home_page
 from users.progress.register_update import register_progress, register_incorrect_answer
 from users.progress.is_exercise_finished import is_exercise_finished
+from users.progress.exercise_state_cache import invalidate_user_exercise_states
 
 from users.questions.normalization import is_user_answer_correct, get_correct_answer
 from users.questions.content_format import format_instruction, format_question, format_gender, format_guidance, \
@@ -340,6 +341,7 @@ def reset_exercise(unit, exercise):
             # Remove any stored result and JSON state by deleting the row
             db.session.delete(row)
             db.session.commit()
+            invalidate_user_exercise_states()
 
         update_progress_in_home_page(session, unit)
 

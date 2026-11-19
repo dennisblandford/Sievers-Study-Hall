@@ -16,8 +16,35 @@ antonym = 'antonym'
 word_order = 'word_order'
 prompt = 'prompt'
 
+# (unit, exercise) -> {"level", "category", "subcategory"}
+# Built once so the very common per-page lookups below avoid re-filtering the
+# full 1.5k-row DataFrame on every call.
+_EXERCISE_META = {}
+for _row in df_exercises.itertuples(index=False):
+    try:
+        _exercise = int(_row.exercise)
+    except (TypeError, ValueError):
+        _exercise = _row.exercise
+    _EXERCISE_META[(_row.unit, _exercise)] = {
+        "level": _row.level,
+        "category": _row.category,
+        "subcategory": _row.subcategory,
+    }
+
+
+def _get_meta(unit, exercise):
+    try:
+        exercise = int(exercise)
+    except (TypeError, ValueError):
+        pass
+    return _EXERCISE_META.get((unit, exercise))
+
 
 def get_level_from_exercise(unit, exercise, df=df_exercises):
+    if df is df_exercises:
+        meta = _get_meta(unit, exercise)
+        return meta["level"] if meta else "N/A"
+
     result = df[(df['unit'] == unit) & (df['exercise'] == exercise)]
     if not result.empty:
         return result.iloc[0]['level']
@@ -56,45 +83,32 @@ def get_exercises_by_unit_and_level(unit, level, df_level=df_exercises):
 
 
 def is_exercise_input(unit, exercise):
-    df = df_exercises
-    return not df[
-        (df['unit'] == unit) &
-        (df['exercise'] == exercise) &
-        (df['category'] == 'input')
-    ].empty
+    meta = _get_meta(unit, exercise)
+    return bool(meta and meta["category"] == 'input')
 
 
 def is_exercise_synonym(unit, exercise):
-    df = df_exercises
-    return not df[
-        (df['unit'] == unit) &
-        (df['exercise'] == exercise) &
-        (df['subcategory'] == 'synonym')
-    ].empty
+    meta = _get_meta(unit, exercise)
+    return bool(meta and meta["subcategory"] == 'synonym')
 
 
 def is_exercise_word_order(unit, exercise):
-    df = df_exercises
-    return not df[
-        (df['unit'] == unit) &
-        (df['exercise'] == exercise) &
-        (df['category'] == 'word_order')
-    ].empty
+    meta = _get_meta(unit, exercise)
+    return bool(meta and meta["category"] == 'word_order')
 
 
 def is_exercise_prompt(unit, exercise):
-    df = df_exercises
-    return not df[
-        (df['unit'] == unit) &
-        (df['exercise'] == exercise) &
-        (df['category'] == 'prompt')
-    ].empty
+    meta = _get_meta(unit, exercise)
+    return bool(meta and meta["category"] == 'prompt')
 
 
 def does_unit_exercise_exist(unit, exercise, df=df_exercises):
     """
     Returns True if (unit, exercise) exists in df_exercises.
     """
+    if df is df_exercises:
+        return _get_meta(unit, exercise) is not None
+
     return (
         ((df["unit"] == unit) &
          (df["exercise"] == int(exercise)))
@@ -103,6 +117,10 @@ def does_unit_exercise_exist(unit, exercise, df=df_exercises):
 
 
 def get_category_from_exercise(unit, exercise, df=df_exercises):
+    if df is df_exercises:
+        meta = _get_meta(unit, exercise)
+        return meta["category"] if meta else "N/A"
+
     result = df[(df['unit'] == unit) & (df['exercise'] == exercise)]
     if not result.empty:
         return result.iloc[0]['category']
@@ -110,6 +128,10 @@ def get_category_from_exercise(unit, exercise, df=df_exercises):
 
 
 def get_subcategory_from_exercise(unit, exercise, df=df_exercises):
+    if df is df_exercises:
+        meta = _get_meta(unit, exercise)
+        return meta["subcategory"] if meta else "N/A"
+
     result = df[(df['unit'] == unit) & (df['exercise'] == exercise)]
     if not result.empty:
         return result.iloc[0]['subcategory']

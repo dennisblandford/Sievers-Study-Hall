@@ -1,15 +1,36 @@
 import random
 
+from flask import g
 from flask_login import current_user
 from sqlalchemy.dialects.sqlite import insert
 
 from data.data_processing.exercises import get_exercises_by_level, df_exercises
 from data.data_processing.total_questions import total_question_exercises, highest_exercise_per_unit
 
-from users.users.models import db, UserExerciseState, UserUnitHomeProgress
+from users.users.models import db, UserUnitHomeProgress
 from users.progress.is_exercise_finished import is_exercise_finished
 from users.progress.exercise_state_cache import get_user_exercise_states
 from users.session_management.verification_session import is_key_in_exercise
+
+
+def get_user_unit_home_progress(user_id):
+    """
+    Returns {unit: completed_exercises} for a user, cached on flask.g.
+
+    The home page needs this for every unit; without the cache that was one
+    query per unit (36+). Cached for the duration of the request.
+    """
+    cache = getattr(g, "_unit_home_progress_cache", None)
+
+    if cache is None or cache.get("user_id") != user_id:
+        rows = UserUnitHomeProgress.query.filter_by(user_id=user_id).all()
+        cache = {
+            "user_id": user_id,
+            "completed": {row.unit: row.completed_exercises for row in rows},
+        }
+        g._unit_home_progress_cache = cache
+
+    return cache["completed"]
 
 
 def compute_completed_exercises(session, unit, highest_exercise):
@@ -75,6 +96,11 @@ def update_progress_in_home_page(session, unit):
         db.session.execute(stmt)
         db.session.commit()
 
+        # Keep the per-request home-progress cache in sync with the write.
+        home_cache = getattr(g, "_unit_home_progress_cache", None)
+        if home_cache is not None and home_cache.get("user_id") == current_user.id:
+            home_cache["completed"][unit] = completed_exercises
+
         if "progress" in session:
             session["progress"].pop(unit, None)
 
@@ -92,13 +118,10 @@ def update_progress_in_home_page(session, unit):
 
 def get_progress_home_page(session, unit):
     if current_user.is_authenticated:
-        row = UserUnitHomeProgress.query.filter_by(
-            user_id=current_user.id,
-            unit=unit
-        ).first()
+        completed = get_user_unit_home_progress(current_user.id)
 
-        if row is not None:
-            return row.completed_exercises
+        if unit in completed:
+            return completed[unit]
 
         elif "progress" in session and unit in session["progress"]:
             return session["progress"][unit]
@@ -184,9 +207,7 @@ def compute_answered_questions_exercise(session, unit, exercise):
 
     # DB-first path for authenticated users
     if current_user.is_authenticated:
-        row = UserExerciseState.query.filter_by(
-            user_id=current_user.id, unit=unit, exercise=ex_int
-        ).first()
+        row = get_user_exercise_states(current_user.id).get((unit, ex_int))
         if not row or not row.state:
             return 0
 

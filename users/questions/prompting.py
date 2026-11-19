@@ -61,12 +61,48 @@ model = {
     'C2': 'openai/gpt-oss-120b',
 }
 
+# The client is cheap to build but holds an HTTP session; reuse one per worker.
+_CLIENT = None
+
+# Bounded cache of successful grading responses. Prompt exercises are graded by
+# a remote model, which dominates the request time; identical submissions (e.g.
+# a user retrying the same sentence) can be answered without another round trip.
+_PROMPT_CACHE = {}
+_PROMPT_CACHE_MAX = 256
+
+
+def _get_client():
+    global _CLIENT
+    if _CLIENT is None:
+        _CLIENT = InferenceClient(
+            api_key=os.environ["HF_TOKEN"],
+            provider="groq",
+            timeout=60.0,
+        )
+    return _CLIENT
+
 
 def get_response_from_prompt(unit, exercise, prompt):
-    client = InferenceClient(
-        api_key=os.environ["HF_TOKEN"],
-        provider="groq",
-    )
+    key = (unit, exercise, prompt)
+
+    cached = _PROMPT_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    result = _request_from_prompt(unit, exercise, prompt)
+
+    # Only cache successful (dict) responses; transient failures should be
+    # retried on the next submission.
+    if isinstance(result, dict):
+        if len(_PROMPT_CACHE) >= _PROMPT_CACHE_MAX:
+            _PROMPT_CACHE.pop(next(iter(_PROMPT_CACHE)))
+        _PROMPT_CACHE[key] = result
+
+    return result
+
+
+def _request_from_prompt(unit, exercise, prompt):
+    client = _get_client()
 
     level = get_level_from_exercise(unit, exercise)
 
@@ -116,3 +152,4 @@ def get_response_from_prompt(unit, exercise, prompt):
             current_app.logger.warning("Hugging Face/Groq unavailable: %s", e)
             return None
         raise
+
