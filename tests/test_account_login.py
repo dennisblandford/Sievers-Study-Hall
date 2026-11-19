@@ -163,14 +163,24 @@ def test_recovery_email_sends_account_code(client, app, monkeypatch):
     assert sent == [("recover@example.com", user.account_id)]
 
 
-def test_recovery_without_email_flashes_message(client):
+def test_recovery_without_email_is_non_revealing(client):
     make_user(email=None)
 
     response = client.post(
         "/recover-account",
         data={"email": "missing@example.com"},
+    )
+
+    # Same redirect as the success case; the endpoint must not reveal whether
+    # an email address is on file.
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/signin")
+
+    followed = client.post(
+        "/recover-account",
+        data={"email": "missing@example.com"},
         follow_redirects=True,
     )
 
-    assert response.status_code == 200
-    assert b"No recovery email on file" in response.data
+    assert b"If that email is on file" in followed.data
+    assert b"No recovery email on file" not in followed.data

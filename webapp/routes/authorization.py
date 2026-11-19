@@ -214,11 +214,11 @@ def recover_account():
 
         if user and user.email:
             send_account_id_email(user.email, user.account_id)
-            flash("If that email is on file, we have sent your account code.", "info")
-            return redirect(url_for("routes.signin"))
 
-        flash("No recovery email on file for that address.", "error")
-        return redirect(url_for("routes.recover_account"))
+        # Always show the same message and redirect, so the endpoint does not
+        # reveal whether an email address is on file.
+        flash("If that email is on file, we have sent your account code.", "info")
+        return redirect(url_for("routes.signin"))
 
     page = {
         'english': 'authorization/recover_account_en.html',
