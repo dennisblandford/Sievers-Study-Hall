@@ -388,7 +388,7 @@ def flag_question(unit, exercise):
     reason = request.form.get('reason')
 
     if current_user.is_authenticated:
-        log_question_flagged(unit, exercise, feedback_message, user_answer, result, reason, email=current_user.email)
+        log_question_flagged(unit, exercise, feedback_message, user_answer, result, reason, user_id=current_user.id)
     else:
         log_question_flagged(unit, exercise, feedback_message, user_answer, result, reason)
 

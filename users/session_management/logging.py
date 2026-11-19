@@ -19,7 +19,7 @@ PROGRESS_DELETED_PATH = os.path.join(LOGS_DIR, "progress_deleted_from_session.cs
 PROMPT_USAGE_PATH = os.path.join(LOGS_DIR, "prompt_usage.csv")
 
 
-def log_exercise_completed(unit, exercise, score, email=None):
+def log_exercise_completed(unit, exercise, score, user_id=None):
     """
     Logs the completion of an exercise by writing an entry to a CSV file with metadata.
 
@@ -32,7 +32,7 @@ def log_exercise_completed(unit, exercise, score, email=None):
         unit (str): The unit identifier of the completed exercise.
         exercise (str or int): The exercise identifier.
         score (): The score
-        email (str): The user's email if the user is connected
+        user_id (int): The internal user id if the user is connected
 
     Returns:
         None
@@ -40,7 +40,7 @@ def log_exercise_completed(unit, exercise, score, email=None):
     now = datetime.now()
 
     create_folder(LOGS_DIR)
-    create_file(EXERCISE_COMPLETED_PATH, "Nr; email; IP; date; unit; exercise; level; category; subcategory; score; language; feedback-enabled; theme")
+    create_file(EXERCISE_COMPLETED_PATH, "Nr; user_id; IP; date; unit; exercise; level; category; subcategory; score; language; feedback-enabled; theme")
 
     next_nr = get_next_number(EXERCISE_COMPLETED_PATH)
     level = get_level_from_exercise(unit, exercise)
@@ -54,7 +54,7 @@ def log_exercise_completed(unit, exercise, score, email=None):
     theme = get_theme()
 
     with open(EXERCISE_COMPLETED_PATH, "a", encoding="utf-8") as file:
-        file.write(f"\n{next_nr}; {email}; {user_ip}; {now}; {unit}; {exercise}; {level}; {category}; {subcategory}; {score}; {language}; {feedback}; {theme}")
+        file.write(f"\n{next_nr}; {user_id}; {user_ip}; {now}; {unit}; {exercise}; {level}; {category}; {subcategory}; {score}; {language}; {feedback}; {theme}")
     return
 
 
@@ -76,16 +76,16 @@ def log_new_signup(user):
     now = datetime.now()
 
     create_folder(LOGS_DIR)
-    create_file(NEW_SIGNUP_PATH, "Nr; date; ID; email")
+    create_file(NEW_SIGNUP_PATH, "Nr; date; ID; user_id")
 
     next_nr = get_next_number(NEW_SIGNUP_PATH)
 
     with open(NEW_SIGNUP_PATH, "a", encoding="utf-8") as file:
-        file.write(f"\n{next_nr}; {now}, {user.id}; {user.email}")
+        file.write(f"\n{next_nr}; {now}; {user.id}; {user.id}")
     return
 
 
-def log_question_flagged(unit, exercise, feedback_message, user_answer, result, reason, email=None):
+def log_question_flagged(unit, exercise, feedback_message, user_answer, result, reason, user_id=None):
     """
     Logs a flagged question to a CSV file with relevant metadata for review.
 
@@ -100,7 +100,7 @@ def log_question_flagged(unit, exercise, feedback_message, user_answer, result, 
         user_answer (str): The user's submitted answer.
         result (str): The evaluation result (e.g., "correct", "incorrect").
         reason (str): The user's reason for flagging
-        email (str): The user's email if connected
+        user_id (int): The internal user id if connected
 
     Returns:
         None
@@ -108,7 +108,7 @@ def log_question_flagged(unit, exercise, feedback_message, user_answer, result, 
     now = datetime.now()
 
     create_folder(LOGS_DIR)
-    create_file(QUESTION_FLAGGED_PATH, "Nr; email; IP; date; unit; exercise; language; result; feedback_message; user_answer; reason;")
+    create_file(QUESTION_FLAGGED_PATH, "Nr; user_id; IP; date; unit; exercise; language; result; feedback_message; user_answer; reason;")
 
     next_nr = get_next_number(QUESTION_FLAGGED_PATH)
 
@@ -122,7 +122,7 @@ def log_question_flagged(unit, exercise, feedback_message, user_answer, result, 
     reason = format_entry(reason)
 
     with open(QUESTION_FLAGGED_PATH, "a", encoding="utf-8") as filepath:
-        filepath.write(f"\n{next_nr}; {email}; {user_ip}; {now}; {unit}; {exercise}; {language}; {result}; {feedback_message}; {user_answer}; {reason}")
+        filepath.write(f"\n{next_nr}; {user_id}; {user_ip}; {now}; {unit}; {exercise}; {language}; {result}; {feedback_message}; {user_answer}; {reason}")
     return
 
 
