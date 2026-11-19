@@ -1,10 +1,23 @@
 from datetime import datetime, timezone
+import sqlite3
 
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
+
+
+@event.listens_for(Engine, "connect")
+def _configure_sqlite(dbapi_connection, connection_record):
+    """Enable WAL + a busy timeout so concurrent readers don't block writers."""
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.close()
 
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.dialects.sqlite import JSON as SQLITE_JSON

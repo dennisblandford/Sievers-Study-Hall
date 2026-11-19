@@ -1,4 +1,4 @@
-from flask import session
+from flask import session, g, has_request_context
 from flask_login import current_user
 
 from users.users.models import UserSettings
@@ -12,9 +12,35 @@ DEFAULT_SETTINGS = {
 }
 
 
+def _get_user_settings_row():
+    """
+    Returns the authenticated user's UserSettings row, cached on flask.g.
+
+    The settings helpers below are called several times per rendered page (theme
+    alone is read by every bookmark/flag icon plus two context processors), so
+    caching the row avoids repeating the same query for the duration of the
+    request.
+    """
+    user_id = current_user.id
+    cache = getattr(g, "_user_settings_cache", None)
+
+    if cache is None or cache.get("user_id") != user_id:
+        row = UserSettings.query.get(user_id)
+        cache = {"user_id": user_id, "row": row}
+        g._user_settings_cache = cache
+
+    return cache["row"]
+
+
+def invalidate_user_settings():
+    """Drops the per-request settings cache after a write."""
+    if has_request_context() and hasattr(g, "_user_settings_cache"):
+        del g._user_settings_cache
+
+
 def is_feedback_enabled():
     if current_user.is_authenticated:
-        row = UserSettings.query.get(current_user.id)
+        row = _get_user_settings_row()
         if row and row.settings:
             return row.settings.get("feedback_enabled", DEFAULT_SETTINGS["feedback_enabled"])
         return DEFAULT_SETTINGS["feedback_enabled"]
@@ -25,7 +51,7 @@ def is_feedback_enabled():
 
 def get_theme():
     if current_user.is_authenticated:
-        row = UserSettings.query.get(current_user.id)
+        row = _get_user_settings_row()
         if row and row.settings:
             return row.settings.get("theme", DEFAULT_SETTINGS["theme"])
         return DEFAULT_SETTINGS["theme"]
@@ -36,7 +62,7 @@ def get_theme():
 
 def are_special_characters_enabled():
     if current_user.is_authenticated:
-        row = UserSettings.query.get(current_user.id)
+        row = _get_user_settings_row()
         if row and row.settings:
             return row.settings.get(
                 "special_characters_enabled",
@@ -53,7 +79,7 @@ def are_special_characters_enabled():
 
 def is_instruction_page_enabled():
     if current_user.is_authenticated:
-        row = UserSettings.query.get(current_user.id)
+        row = _get_user_settings_row()
         if row and row.settings:
             return row.settings.get(
                 "instruction_page_enabled",
@@ -91,7 +117,7 @@ def get_filename_flag():
 
 def are_options_in_word_order_exercises_hidden():
     if current_user.is_authenticated:
-        row = UserSettings.query.get(current_user.id)
+        row = _get_user_settings_row()
         if row and row.settings:
             return row.settings.get(
                 "hide_options_word_order",

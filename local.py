@@ -16,7 +16,7 @@ app = Flask(__name__,
             template_folder='webapp/templates')
 app.secret_key = 'this_is_a_secret_key_for_local_environment'
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///dev.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///dev.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 app.config["MAIL_SERVER"] = "smtp.gmail.com"

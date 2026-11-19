@@ -25,3 +25,8 @@ venv.bak/
 benchmark_exercise_state_cache.py
 loadtest/
 /dashboard/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.uv/

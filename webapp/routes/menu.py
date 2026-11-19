@@ -1,5 +1,8 @@
-from flask import session, request
+import datetime
+
+from flask import session, request, Response, render_template, url_for, current_app
 from flask_login import current_user, login_required
+from werkzeug.routing import BuildError
 
 from typing import cast
 
@@ -241,17 +244,14 @@ def progress():
 
 @routes_bp.route("/robots.txt")
 def robots_txt():
+    sitemap_url = url_for("routes.sitemap", _external=True)
     content = (
         "User-agent: *\n"
         "Disallow:\n"
-        "Sitemap: https://www.sieversstudyhall.com/sitemap.xml\n"
+        f"Sitemap: {sitemap_url}\n"
     )
     return Response(content, mimetype="text/plain")
 
-
-from flask import Response, url_for, render_template, current_app
-from werkzeug.routing import BuildError
-import datetime
 
 @routes_bp.route("/sitemap.xml")
 def sitemap():

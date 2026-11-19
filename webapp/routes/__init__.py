@@ -1,7 +1,12 @@
-from flask import Blueprint, request, session, redirect, url_for
+from flask import Blueprint, request, session, redirect, url_for, jsonify
 routes_bp = Blueprint("routes", __name__)
 
 from webapp.i18n import get_lang_code, dict_key_for  # noqa: E402
+
+
+@routes_bp.route("/healthz", endpoint="healthz")
+def healthz():
+    return jsonify(status="ok")
 
 
 @routes_bp.app_context_processor

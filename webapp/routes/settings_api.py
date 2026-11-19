@@ -4,7 +4,7 @@ from flask_login import current_user
 from . import routes_bp
 from users.users.models import db
 from users.users.models import UserSettings
-from users.users.settings import DEFAULT_SETTINGS, get_theme, are_special_characters_enabled
+from users.users.settings import DEFAULT_SETTINGS, get_theme, are_special_characters_enabled, invalidate_user_settings
 
 
 def get_or_create_settings(user_id):
@@ -12,12 +12,15 @@ def get_or_create_settings(user_id):
     if not row:
         row = UserSettings(user_id=user_id, settings=dict(DEFAULT_SETTINGS))
         db.session.add(row); db.session.commit()
+        invalidate_user_settings()
     else:
         changed = False
         for k, v in DEFAULT_SETTINGS.items():
             if k not in row.settings:
                 row.settings[k] = v; changed = True
-        if changed: db.session.commit()
+        if changed:
+            db.session.commit()
+            invalidate_user_settings()
     return row
 
 
@@ -67,6 +70,7 @@ def api_settings():
         row = UserSettings.query.get(current_user.id)
         row.settings = settings
         db.session.commit()
+        invalidate_user_settings()
     else:
         session["settings"] = settings
         session.modified = True
