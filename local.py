@@ -47,6 +47,8 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 with app.app_context():
     db.create_all()
+    from webapp.migration_account_ids import migrate_account_ids
+    migrate_account_ids()
 
 #with app.app_context():
 #    migrate_incorrect_state()
