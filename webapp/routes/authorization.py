@@ -1,10 +1,10 @@
-import os
 from datetime import datetime, timezone
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from urllib.parse import urlparse
 
 from flask import current_app
 from flask import render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, current_user, logout_user, login_required
+from flask_mail import Message
 
 from data.content.application.buttons import HOMEPAGE
 from data.data_processing.units import units
@@ -13,130 +13,81 @@ from data.data_processing.total_questions import total_question_exercises
 
 from users.users.models import db, User, UserExerciseState
 from users.users.service import make_qid
+from users.users.settings import invalidate_user_settings
 from users.session_management.logging import log_new_signup
 
+from webapp.extensions import limiter
 from webapp.i18n import get_language
 from webapp.routes.settings_api import get_or_create_settings
 
 from . import routes_bp
 
 
-RESET_SALT = "password-reset"  # just a constant string
-
-def _make_serializer():
-    # uses your Flask SECRET_KEY
-    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
-
-def generate_reset_token(user):
-    s = _make_serializer()
-    # encode user id (or email); id is fine
-    return s.dumps({"uid": user.id}, salt=RESET_SALT)
-
-def verify_reset_token(token, max_age_seconds=3600):
-    s = _make_serializer()
-    try:
-        data = s.loads(token, salt=RESET_SALT, max_age=max_age_seconds)
-    except SignatureExpired:
-        return None  # token valid but expired
-    except BadSignature:
+def normalize_account_id(raw):
+    """Return a canonical UUID string, or None when the input is malformed."""
+    if not raw:
         return None
-    uid = data.get("uid")
-    return User.query.get(uid)
 
-import smtplib, ssl
-from email.message import EmailMessage
+    s = raw.strip().lower().replace("-", "").replace(" ", "")
 
-def send_password_reset_email(to_email, reset_url):
-    msg = EmailMessage()
-    msg["Subject"] = "Reset your Sievers Study Hall password"
-    msg["From"] = os.environ["MAIL_USERNAME"]
-    msg["To"] = to_email
-    msg.set_content(
-        f"Hello,\n\nClick the link to reset your password:\n{reset_url}\n\n"
-        "This link expires in 1 hour.\n\n— Sievers Study Hall"
+    if len(s) != 32:
+        return None
+
+    return f"{s[0:8]}-{s[8:12]}-{s[12:16]}-{s[16:20]}-{s[20:32]}"
+
+
+def _is_safe_next(target):
+    """Only allow redirects back to this site (relative or same-host URLs)."""
+    if not target:
+        return False
+
+    # Backslashes and protocol-relative URLs are treated as another host by
+    # browsers even when urlparse does not report a netloc.
+    if "\\" in target or target.startswith("//"):
+        return False
+
+    parsed = urlparse(target)
+
+    if parsed.scheme:
+        if parsed.scheme not in ("http", "https"):
+            return False
+        if parsed.netloc != request.host:
+            return False
+    elif parsed.netloc and parsed.netloc != request.host:
+        return False
+
+    return True
+
+
+def send_account_id_email(to_email, account_id):
+    """Send the user's account code to their recovery email address."""
+    mail = current_app.extensions.get("mail")
+    sender = current_app.config.get("MAIL_USERNAME")
+
+    if mail is None or not sender:
+        # No SMTP credentials configured (e.g. local development).
+        current_app.logger.info(
+            "[account-code] would send %s to %s", account_id, to_email
+        )
+        return
+
+    message = Message(
+        subject="Your Sievers Study Hall account code",
+        sender=sender,
+        recipients=[to_email],
     )
-    ctx = ssl.create_default_context()
-    with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as s:
-        s.starttls(context=ctx)
-        s.login(os.environ["MAIL_USERNAME"], os.environ["MAIL_PASSWORD"])
-        s.send_message(msg)
-
-# --- Forgot password: request form ---
-@routes_bp.route("/forgot-password", methods=["GET", "POST"])
-def forgot_password():
-
-    language = get_language(request, session)
-
-    if current_user.is_authenticated:
-        return redirect(url_for("routes.settings"))
-
-    if request.method == "POST":
-        email = (request.form.get("email") or "").strip().lower()
-        user = User.query.filter_by(email=email).first()
-        if user:
-            token = generate_reset_token(user)
-            reset_url = url_for("routes.reset_password", token=token, _external=True, _scheme="https")
-            send_password_reset_email(email, reset_url)
-            current_app.logger.info(f"[reset-link] {reset_url}")
-            flash("If that email exists, a reset link has been sent.", "info")
-            # You can also display the link in dev:
-            if current_app.debug:
-                flash(f"Dev reset link: {reset_url}", "info")
-        else:
-            # Do not reveal whether email exists
-            flash("If that email exists, a reset link has been sent.", "info")
-        return redirect(url_for("routes.signin"))
-
-    page = {
-        'english': 'authorization/forgot_password_en.html',
-        'french': 'authorization/forgot_password_fr.html',
-    }
-
-    return render_template(page[language])
-
-
-# --- Reset password: uses token ---
-@routes_bp.route("/reset-password/<token>", methods=["GET", "POST"])
-def reset_password(token):
-
-    language = get_language(request, session)
-
-    if current_user.is_authenticated:
-        return redirect(url_for("routes.settings"))
-
-    user = verify_reset_token(token)
-    if not user:
-        flash("This reset link is invalid or has expired.", "error")
-        return redirect(url_for("routes.forgot_password"))
-
-    if request.method == "POST":
-        pw1 = request.form.get("password") or ""
-        pw2 = request.form.get("password2") or ""
-        if not pw1 or not pw2:
-            flash("Please enter and confirm your new password.", "error")
-            return redirect(url_for("routes.reset_password", token=token))
-        if pw1 != pw2:
-            flash("Passwords do not match.", "error")
-            return redirect(url_for("routes.reset_password", token=token))
-        if len(pw1) < 8:
-            flash("Password must be at least 8 characters.", "error")
-            return redirect(url_for("routes.reset_password", token=token))
-
-        user.set_password(pw1)
-        db.session.commit()
-        flash("Your password has been updated. Please sign in.", "success")
-        return redirect(url_for("routes.signin"))
-
-    page = {
-        'english': 'authorization/reset_password_en.html',
-        'french': 'authorization/reset_password_fr.html',
-    }
-
-    return render_template(page[language],
-                           token=token)
+    message.body = (
+        "Hello,\n\n"
+        "Your Sievers Study Hall account code is:\n\n"
+        f"{account_id}\n\n"
+        "Keep it somewhere safe. It is the only way to sign in to your account.\n\n"
+        "— Sievers Study Hall"
+    )
+    mail.send(message)
 
 
 @routes_bp.route("/signin", methods=["GET", "POST"])
+@limiter.limit("10/minute", methods=["POST"])
 def signin():
 
     language = get_language(request, session)
@@ -146,22 +97,31 @@ def signin():
         return redirect(url_for("routes.settings"))
 
     if request.method == "POST":
-        email = (request.form.get("email") or "").strip().lower()
-        password = request.form.get("password") or ""
+        account_id = normalize_account_id(request.form.get("account_id"))
         remember = bool(request.form.get("remember"))
 
-        user = User.query.filter_by(email=email).first()
-        if not user or not user.check_password(password):
-            flash("Invalid email or password.", "error")
+        user = (
+            User.query.filter_by(account_id=account_id).first()
+            if account_id
+            else None
+        )
+
+        if not user:
+            flash("Invalid account code.", "error")
             return redirect(url_for("routes.signin"))
 
         login_user(user, remember=remember)
-        next_url = request.args.get("next") or url_for("routes.home")
 
         try:
             get_or_create_settings(current_user.id)
         except Exception:
             pass
+
+        merge_anonymous_progress_in_database()
+
+        next_url = request.args.get("next")
+        if not _is_safe_next(next_url):
+            next_url = url_for("routes.home")
 
         return redirect(next_url)
 
@@ -176,6 +136,7 @@ def signin():
 
 
 @routes_bp.route("/signup", methods=["GET", "POST"])
+@limiter.limit("10/minute", methods=["POST"])
 def signup():
 
     language = get_language(request, session)
@@ -184,23 +145,7 @@ def signup():
         return redirect(url_for("routes.settings"))
 
     if request.method == "POST":
-        email = (request.form.get("email") or "").strip().lower()
-        pw1 = request.form.get("password") or ""
-        pw2 = request.form.get("password2") or ""
-
-        if not email or not pw1 or not pw2:
-            flash("Email and both passwords are required.", "error")
-            return redirect(url_for("routes.signup"))
-        if pw1 != pw2:
-            flash("Passwords do not match.", "error")
-            return redirect(url_for("routes.signup"))
-        if User.query.filter_by(email=email).first():
-            flash("Email already registered.", "error")
-            return redirect(url_for("routes.signup"))
-
-        # create user
-        user = User(email=email)
-        user.set_password(pw1)
+        user = User()
         db.session.add(user)
         db.session.commit()
 
@@ -215,11 +160,69 @@ def signup():
         except Exception:
             pass
 
-        return redirect(url_for("routes.home"))
+        return redirect(url_for("routes.account_created"))
 
     page = {
         'english': 'authorization/signup_en.html',
         'french': 'authorization/signup_fr.html',
+    }
+
+    return render_template(page[language],
+                           homepage=HOMEPAGE[language],
+                           )
+
+
+@routes_bp.route("/account/created", methods=["GET", "POST"])
+@login_required
+def account_created():
+
+    language = get_language(request, session)
+
+    if request.method == "POST":
+        row = get_or_create_settings(current_user.id)
+        row.settings = {
+            **(row.settings or {}),
+            "account_code_acknowledged": True,
+        }
+        db.session.commit()
+        invalidate_user_settings()
+        return redirect(url_for("routes.home"))
+
+    page = {
+        'english': 'authorization/account_created_en.html',
+        'french': 'authorization/account_created_fr.html',
+    }
+
+    return render_template(page[language],
+                           account_id=current_user.account_id,
+                           homepage=HOMEPAGE[language],
+                           )
+
+
+@routes_bp.route("/recover-account", methods=["GET", "POST"])
+@limiter.limit("10/minute", methods=["POST"])
+def recover_account():
+
+    language = get_language(request, session)
+
+    if current_user.is_authenticated:
+        return redirect(url_for("routes.settings"))
+
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        user = User.query.filter_by(email=email).first() if email else None
+
+        if user and user.email:
+            send_account_id_email(user.email, user.account_id)
+            flash("If that email is on file, we have sent your account code.", "info")
+            return redirect(url_for("routes.signin"))
+
+        flash("No recovery email on file for that address.", "error")
+        return redirect(url_for("routes.recover_account"))
+
+    page = {
+        'english': 'authorization/recover_account_en.html',
+        'french': 'authorization/recover_account_fr.html',
     }
 
     return render_template(page[language],

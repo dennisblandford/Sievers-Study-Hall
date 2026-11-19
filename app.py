@@ -5,6 +5,7 @@ from flask_mail import Mail
 from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from webapp.extensions import limiter
 from webapp.routes import routes_bp
 from users.users.models import db, User
 
@@ -31,6 +32,8 @@ app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
 
 mail = Mail()
 mail.init_app(app)
+
+limiter.init_app(app)
 
 db.init_app(app)
 

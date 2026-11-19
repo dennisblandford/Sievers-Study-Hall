@@ -6,6 +6,7 @@ from flask_login import LoginManager
 from flask_migrate import Migrate
 
 from users.users.models import db, User
+from webapp.extensions import limiter
 from webapp.migration import migrate_incorrect_state
 
 from webapp.routes import routes_bp
@@ -27,6 +28,8 @@ app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
 
 mail = Mail()
 mail.init_app(app)
+
+limiter.init_app(app)
 
 db.init_app(app)
 
