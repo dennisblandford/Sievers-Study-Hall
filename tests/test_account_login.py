@@ -6,7 +6,7 @@ import pytest
 from flask import Flask
 from flask_login import LoginManager
 
-from users.users.models import db, User, UserExerciseState
+from users.users.models import User, UserExerciseState, db
 from webapp.extensions import limiter
 from webapp.routes import routes_bp
 from webapp.routes.authorization import normalize_account_id
